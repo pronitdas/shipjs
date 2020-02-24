@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs';
-import conventionalChangelog from 'conventional-changelog';
+import conventionalChangelogCore from 'conventional-changelog-core';
+import conventionalChangelogPresetLoader from 'conventional-changelog-preset-loader';
 import tempfile from 'tempfile';
 import addStream from 'add-stream';
 import runStep from '../runStep';
@@ -39,6 +40,7 @@ export default ({
           gitRawCommitsOpts,
           resolve,
           reject,
+          dir,
         });
       });
     }
@@ -118,6 +120,21 @@ function prepareParams({
   }
   const templateContext =
     args.context && require(path.resolve(dir, args.context));
+
+  if (args.preset) {
+    try {
+      args.config = conventionalChangelogPresetLoader(args.preset);
+    } catch (err) {
+      if (typeof args.preset === 'object') {
+        args.warn(`Preset: "${args.preset.name}" ${err.message}`);
+      } else if (typeof args.preset === 'string') {
+        args.warn(`Preset: "${args.preset}" ${err.message}`);
+      } else {
+        args.warn(`Preset: ${err.message}`);
+      }
+    }
+  }
+
   return { args, gitRawCommitsOpts, templateContext };
 }
 
@@ -127,11 +144,15 @@ function runConventionalChangelog({
   gitRawCommitsOpts,
   resolve,
   reject,
+  dir,
 }) {
-  const changelogStream = conventionalChangelog(
+  const changelogStream = conventionalChangelogCore(
     args,
     templateContext,
-    gitRawCommitsOpts
+    gitRawCommitsOpts,
+    undefined,
+    undefined,
+    { path: dir }
   ).on('error', reject);
 
   const readStream = fs.createReadStream(args.infile).on('error', reject);
